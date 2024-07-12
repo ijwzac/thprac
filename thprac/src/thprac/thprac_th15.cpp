@@ -1,5 +1,6 @@
 ﻿#include "thprac_games.h"
 #include "thprac_utils.h"
+#include "thprac_log.h"
 
 
 namespace THPrac {
@@ -95,21 +96,37 @@ namespace TH15 {
         SINGLETON(THGuiPrac)
     public:
 
+        // State is called very frequently
+        // Probably it's called very frame when GUI is open, but I suspect 
+        // if player doesn't do anything new, it just repeats the same behaviour as the last call
         __declspec(noinline) void State(int state)
         {
             switch (state) {
             case 0:
+                log_printf("THGuiPrac:State. state is 0\n");
                 break;
             case 1:
+                // this case is chosen for ~12 times after player first opens practice GUI
+                //log_printf("THGuiPrac:State. state is 1\n");
                 mDiffculty = *((int32_t*)0x4e7410);
                 SetFade(0.8f, 0.1f);
                 Open();
                 thPracParam.Reset();
             case 2:
+                // this case is chosen as long as player is not doing anything and looking at the GUI
+                //log_printf("THGuiPrac:State. state is 2\n");
                 break;
             case 3:
+                // this case is chosen between: player starts the practice scene (press z) and the game scene is loaded
+                log_printf("THGuiPrac:State. state is 3\n");
                 SetFade(0.8f, 0.1f);
                 Close();
+
+                // The folling code combined with the change in THPatch can force player to start with section 30 (TanNv' shotgun)
+                // But it alone can only make player go to stage 3
+                //log_printf("Now I force set section to 30\n");
+                //*mStage = 3;
+                //*mSection = 30;
 
                 // Fill Param
                 thPracParam.mode = *mMode;
@@ -127,12 +144,20 @@ namespace TH15 {
                 thPracParam.power = *mPower;
                 thPracParam.value = *mValue;
                 thPracParam.graze = *mGraze;
+
+                char buffer[500];
+                sprintf(buffer, "THGuiPrac:State. stage:%i. section:%i\n", thPracParam.stage, thPracParam.section);
+                log_print(buffer);
+
                 break;
             case 4:
+                // this case is chosen for ~6 times after player closes practice GUI
+                //log_printf("THGuiPrac:State. state is 4\n");
                 Close();
                 *mNavFocus = 0;
                 break;
             default:
+                log_printf("THGuiPrac:State. state is default\n");
                 break;
             }
         }
@@ -183,6 +208,7 @@ namespace TH15 {
             }
             return nullptr;
         }
+        // PracticeMenu() is called every frame when player is looking at the menu in practice mode
         void PracticeMenu()
         {
             mMode();
@@ -443,6 +469,7 @@ namespace TH15 {
             mAutoBomb.SetTextOffsetRel(x_offset_1, x_offset_2);
             mElBgm.SetTextOffsetRel(x_offset_1, x_offset_2);
         }
+        // Called every frame when player is looking at Backspace menu
         virtual void OnContentUpdate() override
         {
             mMuteki();
@@ -643,6 +670,11 @@ namespace TH15 {
     EHOOK_G1(th15_chapter_set, 0x43dd58)
     {
         if (th15_chapter_set::GetData() != -1) {
+            // Not called frequently. Sometimes called after practice select Daozhong but not always
+            //char buffer[500];
+            //sprintf(buffer, "EHOOK_G1(th15_chapter_set, 0x43dd58). data:%i\n",
+            //    th15_chapter_set::GetData());
+            //log_print(buffer);
             *((int32_t*)0x4e73f8) = th15_chapter_set::GetData();
             th15_chapter_set::GetData() = -1;
         }
@@ -690,8 +722,16 @@ namespace TH15 {
         ecl.SetPos(start);
         ecl << ecl_time << 0x0018000C << 0x02ff0000 << 0x00000000 << dest - start << at_frame;
     }
+    // THStageWarp() is called when jumping to the part that you shoot fairies
+    // stage and portion starts from 1 (thPracParam.stage start from 0). So Ex stage is 7
     __declspec(noinline) void THStageWarp(ECLHelper& ecl, int stage, int portion)
     {
+        char buffer[500];
+        sprintf(buffer, "THStageWarp. stage:%i. portion:%i\n", stage, portion);
+        log_print(buffer);
+
+        // Directly jump to a case below and return seems to be useless. Player still go to the one they choose
+
         if (stage == 1) {
             switch (portion) {
             case 1:
@@ -913,6 +953,18 @@ namespace TH15 {
             }
         }
     }
+
+    // Called once after the scene that player chooses for practice is loaded
+    // thPracParam.stage starts from 0, so EX stage is 6
+    // .phase seems to maintain 0
+    // .section is boss' act number shared by all bosses, starting from 0
+    // A boss' non-spell cards and spell cards are the same to this number
+    // Some confusing stuff:
+    // Junko's first section is 42, but Piece's last section is 40
+    // Junko's last section is 52, and EX Doremi's first is 53
+    // EX Doremi's last is 55, and Godess' first is 56
+    // .mode seems to maintain 1
+    // .phase is normally 0. May only apply to Junko's bullet hell and Godess' last card, both have 4 phases, so .phase is 0 to 3
     __declspec(noinline) void THPatch(ECLHelper& ecl, th_sections_t section)
     {
         auto st7_hide_subboss = [&]() {
@@ -939,6 +991,28 @@ namespace TH15 {
             ecl << 0 << 0x0020000b << 0x01ff0000 << 0 << 0xc
                 << 0x73736f42 << 0x64726143 << ordinal;
         };
+
+        // log_printf doesn't work somehow
+        char buffer[500];
+        sprintf(buffer, "THPatch. stage:%i. phase:%i. section:%i. mode:%i\n", 
+            thPracParam.stage, thPracParam.phase, thPracParam.section, thPracParam.mode);
+        if (section != thPracParam.section) {
+            log_printf("Caution! section is found to be different from thPracParam.section!");
+        }
+        log_print(buffer);
+
+        // The following code combined with the change in State() can force player to jump to section 30
+        // But it alone doesn't do anything
+        //log_printf("Now I force jump to section 30!\n");
+        //thPracParam.stage = 3;
+        //thPracParam.section = 30;
+        //ECLJump(ecl, 0x860c, 0x89b0, 60);
+        //ecl.SetFile(2);
+        //ECLSkipChapter(2);
+        //ECLJump(ecl, 0x41e0, 0x42c8, 1); // Utilize Spell Practice Jump
+        //ecl << pair { 0x42d8, 2500 }; // Set Health
+        //ecl << pair { 0x42f8, (int8_t)0x33 }; // Set Spell Ordinal
+        //return;
 
         switch (section) {
         case THPrac::TH15::TH15_ST1_MID1:
@@ -1711,6 +1785,7 @@ namespace TH15 {
             break;
         }
     }
+    // THSectionPatch can change section within a stage after the stage is loaded, but can't change stage
     __declspec(noinline) void THSectionPatch()
     {
         ECLHelper ecl;
@@ -1738,6 +1813,42 @@ namespace TH15 {
     void THSaveReplay(char* repName)
     {
         ReplaySaveParam(mb_to_utf16(repName, 932).c_str(), thPracParam.GetJson());
+    }
+
+    void ResetLifeBomb()
+    {
+        // Well, only effective after player chooses restart game, which is not a bad design
+
+        thPracParam.life = 5;
+
+        *(int32_t*)(0x4E740C) = (int32_t)(thPracParam.score / 10);
+        *(int32_t*)(0x4E7450) = thPracParam.life;
+        *(int32_t*)(0x4E7454) = thPracParam.life_fragment;
+        *(int32_t*)(0x4E745C) = thPracParam.bomb;
+        *(int32_t*)(0x4E7460) = thPracParam.bomb_fragment;
+        *(int32_t*)(0x4E7440) = thPracParam.power;
+        *(int32_t*)(0x4E7434) = thPracParam.value * 100;
+        *(int32_t*)(0x4E741C) = thPracParam.graze; // 0x4E7420: Chapter Graze
+
+    }
+    void SetSection()
+    {
+        // Well, only effective after player chooses restart game, which is not a bad design
+        th15_chapter_set::GetHook().Disable();
+        th15_chapter_disable::GetHook().Disable();
+        th15_stars_bgm_sync::GetHook().Disable();
+
+        // TODO: well, this is not always working
+        int shouldBeSec = *((int32_t*)0x4e73f8);
+        //char buffer[500];
+        //sprintf(buffer, "FakePracticeStart. sth:%i\n", sth);
+        //log_print(buffer);
+
+        thPracParam.section = shouldBeSec;
+        thPracParam.life = 5;
+
+        THSectionPatch();
+        thPracParam._playLock = true;
     }
 
     static bool frameStarted = false;
@@ -1801,6 +1912,11 @@ namespace TH15 {
     }
     EHOOK_DY(th15_patch_main, 0x43c68c)
     {
+        // called once after player load into the scene, either from practice or normal or ex
+        // Changes after this point can be applied to sections in this stage, and also life, bomb, etc.
+        // But too late to switch between stages
+        log_printf("Start of th15_patch_main\n");
+
         th15_chapter_set::GetHook().Disable();
         th15_chapter_disable::GetHook().Disable();
         th15_stars_bgm_sync::GetHook().Disable();
@@ -1843,8 +1959,18 @@ namespace TH15 {
     {
         THGuiRep::singleton().State(3);
     }
+    // Called every frame, of course
     EHOOK_DY(th15_update, 0x4015fa)
     {
+        static int lifePrev;
+        int lifeNow = *(int32_t*)(0x4E7450);
+        
+        if (lifePrev > lifeNow) {
+            log_printf("\n=====Life num decrease=====\n\n");
+            ResetLifeBomb();
+            SetSection();
+        }
+        lifePrev = lifeNow;
         GameGuiBegin(IMPL_WIN32_DX9, !THAdvOptWnd::singleton().IsOpen());
 
         // Gui components update
@@ -1907,6 +2033,9 @@ namespace TH15 {
 
 void TH15Init()
 {
+    log_init(true, true);
+    log_printf("Before hooking TH15\n");
+
     TH15::THInitHook::singleton().EnableAllHooks();
 }
 }

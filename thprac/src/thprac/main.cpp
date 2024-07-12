@@ -6,6 +6,7 @@
 #include "thprac_main.h"
 #include "thprac_gui_locale.h"
 #include "thprac_hook.h"
+#include "thprac_log.h"
 #include <Windows.h>
 #include <psapi.h>
 #include <tlhelp32.h>

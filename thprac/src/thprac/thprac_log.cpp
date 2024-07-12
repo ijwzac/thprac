@@ -19,6 +19,8 @@ void log_print(const char* msg, size_t len)
     }
 }
 
+// This function was not called in the original program. I call it when Hooking, like thprac_th15.cpp::TH15init()
+// The log file is in the dir that runs this program. E.g., D:\Dev\coding\thprac\thprac\thprac for thprac itself, the game's dir for each game
 void log_init(bool launcher, bool console)
 {
     // The lengths I'll go to not allocate on the heap
