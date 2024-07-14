@@ -1701,3 +1701,5 @@ void TH13Init()
     TH13::THInitHook::singleton().EnableAllHooks();
 }
 }
+
+// Stage is either 0x4BE81C or 0x4BE820

@@ -71,6 +71,7 @@
     <ClInclude Include="src\thprac\thprac_main.h" />
     <ClInclude Include="src\thprac\thprac_th19.h" />
     <ClInclude Include="src\thprac\thprac_utils.h" />
+	<ClInclude Include="src\thprac\thprac_pointdevice.h" />
     <ClInclude Include="src\thprac\thprac_version.h" />
     <ClInclude Include="src\thprac\utils\utils.h" />
     <ClInclude Include="src\thprac\utils\wininternal.h" />
@@ -142,6 +143,7 @@
     <ClCompile Include="src\thprac\thprac_th185.cpp" />
     <ClCompile Include="src\thprac\thprac_th19.cpp" />
     <ClCompile Include="src\thprac\thprac_utils.cpp" />
+	<ClCompile Include="src\thprac\thprac_pointdevice.cpp" />
     <ClCompile Include="src\thprac\thprac_version.cpp" />
     <ClCompile Include="src\thprac\thprac_log.cpp" />
   </ItemGroup>

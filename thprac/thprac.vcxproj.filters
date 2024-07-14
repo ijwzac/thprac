@@ -49,6 +49,9 @@
     <ClInclude Include="src\thprac\thprac_utils.h">
       <Filter>THPrac Utils</Filter>
     </ClInclude>
+	<ClInclude Include="src\thprac\thprac_pointdevice.h">
+	  <Filter>THPrac Utils</Filter>
+	</ClInclude>
     <ClInclude Include="src\thprac\thprac_hook.h">
       <Filter>THPrac Hook</Filter>
     </ClInclude>
@@ -216,6 +219,9 @@
     <ClCompile Include="src\thprac\thprac_utils.cpp">
       <Filter>THPrac Utils</Filter>
     </ClCompile>
+	<ClCompile Include="src\thprac\thprac_pointdevice.cpp">
+	  <Filter>THPrac Utils</Filter>
+	</ClCompile>
     <ClCompile Include="src\thprac\thprac_hook.cpp">
       <Filter>THPrac Hook</Filter>
     </ClCompile>

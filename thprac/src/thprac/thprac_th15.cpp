@@ -1,7 +1,7 @@
 ﻿#include "thprac_games.h"
 #include "thprac_utils.h"
 #include "thprac_log.h"
-
+#include <map>
 
 namespace THPrac {
 namespace TH15 {
@@ -79,6 +79,63 @@ namespace TH15 {
     };
     THPracParam thPracParam {};
 
+    // key is EX section that is read from memory, value is th_sections_t that is used by
+    // THPatch() to reset the game's script to the section
+    const std::map<int32_t, th_sections_t> bossSectionMapEX = {
+        { 31, THPrac::TH15::TH15_ST7_MID1 },
+        { 32, THPrac::TH15::TH15_ST7_MID2 },
+        { 33, THPrac::TH15::TH15_ST7_MID3 },
+        { 43, THPrac::TH15::TH15_ST7_END_NS1 },
+        { 62, THPrac::TH15::TH15_ST7_END_S1 },
+        { 44, THPrac::TH15::TH15_ST7_END_NS2 },
+        { 63, THPrac::TH15::TH15_ST7_END_S2 },
+        { 45, THPrac::TH15::TH15_ST7_END_NS3 },
+        { 64, THPrac::TH15::TH15_ST7_END_S3 },
+        { 46, THPrac::TH15::TH15_ST7_END_NS4 },
+        { 65, THPrac::TH15::TH15_ST7_END_S4 },
+        { 47, THPrac::TH15::TH15_ST7_END_NS5 },
+        { 66, THPrac::TH15::TH15_ST7_END_S5 },
+        { 48, THPrac::TH15::TH15_ST7_END_NS6 },
+        { 67, THPrac::TH15::TH15_ST7_END_S6 },
+        { 49, THPrac::TH15::TH15_ST7_END_NS7 },
+        { 68, THPrac::TH15::TH15_ST7_END_S7 },
+        { 50, THPrac::TH15::TH15_ST7_END_NS8 },
+        { 69, THPrac::TH15::TH15_ST7_END_S8 },
+        { 70, THPrac::TH15::TH15_ST7_END_S9 },
+        { 71, THPrac::TH15::TH15_ST7_END_S10 },
+    };
+
+    const std::map<int32_t, int> warpSectionMapEX = {
+        // 0-9 are fairies, except 5 is talk with doremi
+        { 0, 1 },
+        { 1, 2 },
+        { 2, 3 },
+        { 3, 4 },
+        { 4, 5 },
+        { 6, 6 },
+        { 7, 7 },
+        { 8, 8 },
+        { 9, 9 },
+    };
+
+    const THPrac::TH15::th_sections_t FindBossSectionEX(uint32_t key)
+    {
+        auto bossSec = bossSectionMapEX.find(key);
+        if (bossSec != bossSectionMapEX.end()) {
+            return bossSec->second;
+        }
+        return THPrac::TH15::A0000ERROR;
+    }
+
+    const int FindWarpSectionEX(uint32_t key)
+    {
+        auto warpSec = warpSectionMapEX.find(key);
+        if (warpSec != warpSectionMapEX.end()) {
+            return warpSec->second;
+        }
+        return -1;
+    }
+
     class THGuiPrac : public Gui::GameGuiWnd {
         THGuiPrac() noexcept
         {
@@ -118,7 +175,7 @@ namespace TH15 {
                 break;
             case 3:
                 // this case is chosen between: player starts the practice scene (press z) and the game scene is loaded
-                log_printf("THGuiPrac:State. state is 3\n");
+                //log_printf("THGuiPrac:State. state is 3\n");
                 SetFade(0.8f, 0.1f);
                 Close();
 
@@ -145,9 +202,9 @@ namespace TH15 {
                 thPracParam.value = *mValue;
                 thPracParam.graze = *mGraze;
 
-                char buffer[500];
-                sprintf(buffer, "THGuiPrac:State. stage:%i. section:%i\n", thPracParam.stage, thPracParam.section);
-                log_print(buffer);
+                //char buffer[500];
+                //sprintf(buffer, "THGuiPrac:State. stage:%i. section:%i\n", thPracParam.stage, thPracParam.section);
+                //log_print(buffer);
 
                 break;
             case 4:
@@ -1826,30 +1883,86 @@ namespace TH15 {
         *(int32_t*)(0x4E7454) = thPracParam.life_fragment;
         *(int32_t*)(0x4E745C) = thPracParam.bomb;
         *(int32_t*)(0x4E7460) = thPracParam.bomb_fragment;
-        *(int32_t*)(0x4E7440) = thPracParam.power;
+        //*(int32_t*)(0x4E7440) = thPracParam.power;
         *(int32_t*)(0x4E7434) = thPracParam.value * 100;
         *(int32_t*)(0x4E741C) = thPracParam.graze; // 0x4E7420: Chapter Graze
 
     }
-    void SetSection()
+
+    int storedSec = -1;
+
+    void ResetSection()
     {
         // Well, only effective after player chooses restart game, which is not a bad design
         th15_chapter_set::GetHook().Disable();
         th15_chapter_disable::GetHook().Disable();
         th15_stars_bgm_sync::GetHook().Disable();
 
-        // TODO: well, this is not always working
-        int shouldBeSec = *((int32_t*)0x4e73f8);
-        //char buffer[500];
-        //sprintf(buffer, "FakePracticeStart. sth:%i\n", sth);
-        //log_print(buffer);
+        ECLHelper ecl;
+        ecl.SetBaseAddr((void*)GetMemAddr(0x4e9a80, 0x17c, 0xC));
+        char buffer[500];
 
-        thPracParam.section = shouldBeSec;
-        thPracParam.life = 5;
+        auto section = *(int32_t*)(0x4e73f8);
 
-        THSectionPatch();
+        auto warpNum = FindWarpSectionEX(section);
+        if (warpNum != -1) {
+            sprintf(buffer, "ResetSection to EX warp %i. storedSec:%i\n", warpNum, storedSec);
+            log_print(buffer);
+
+            
+            // set gamemode to 14 can restart the current stage
+            // to 10 starts the game (like click the option in menu)
+            // but this doesn't reload the script, so we need THStageWarp or THPatch
+            *((int32_t*)0x4e7ecc) = 0xE;
+
+            THStageWarp(ecl, 7, warpNum);
+            return;
+        }
+
+        auto bossSecNum = FindBossSectionEX(section);
+        if (bossSecNum != THPrac::TH15::A0000ERROR) {
+            sprintf(buffer, "ResetSection to EX boss section %i. storedSec:%i\n", bossSecNum, storedSec);
+            log_print(buffer);
+
+            *((int32_t*)0x4e7ecc) = 0xE;
+
+            thPracParam.stage = 6;
+            thPracParam.phase = 0;
+            thPracParam.section = int32_t(bossSecNum); // This is wrong but doesn't matter
+            thPracParam.dlg = false;
+            THPatch(ecl, bossSecNum);
+            return;
+        }
+
+        log_printf("ResetSection warning: this section is not in map. probably transition section\n");
+        // TODO: what's this?
         thPracParam._playLock = true;
     }
+
+    // Doesn't work, somehow
+    //void SimulateKeyPress(WORD virtualKey)
+    //{
+    //    // Create an array of INPUT structures for key down and key up events
+    //    INPUT inputs[2] = {};
+
+    //    // Key down event
+    //    inputs[0].type = INPUT_KEYBOARD;
+    //    inputs[0].ki.wVk = virtualKey;
+    //    inputs[0].ki.dwFlags = 0; // 0 for key down
+
+    //    // Key up event
+    //    inputs[1].type = INPUT_KEYBOARD;
+    //    inputs[1].ki.wVk = virtualKey;
+    //    inputs[1].ki.dwFlags = KEYEVENTF_KEYUP; // KEYEVENTF_KEYUP for key up
+
+    //    // Send the input events
+    //    UINT uSent = SendInput(2, inputs, sizeof(INPUT));
+    //    if (uSent != 2) {
+    //        log_printf("SendInput has error\n");
+    //    } else {
+    //        log_printf("SendInput success\n");
+    //    }
+    //}
 
     static bool frameStarted = false;
 
@@ -1897,9 +2010,15 @@ namespace TH15 {
         THGuiPrac::singleton().State(4);
     }
     PATCH_DY(th15_prac_menu_enter_1, 0x4678a2, "\xeb", 1);
+    // th15.exe+0x67760 is probably frame update function
     EHOOK_DY(th15_prac_menu_enter_2, 0x467b85)
     {
-        pCtx->Ecx = thPracParam.stage;
+        pCtx->Ecx = thPracParam.stage; // 0x467b85 is in the middle of a function (th15.exe+0x67B2A or 67760
+        // , not sure if the former is a function, and the latter is a huge function that's called very frame), 
+        //and modifying ecx register at this instruction will make practice mode jump to the stage we want
+        // call chain: 0x67B2A or 67760 <- 608D0 <- 1567 <- 72878 <- 927A4
+        // The stage value impacts value in addr 004E9BD8, which is used by many instructions including 3c43c
+        // 3c43c <- 9098d <- 90ad4
     }
     EHOOK_DY(th15_disable_prac_menu_1, 0x467d31)
     {
@@ -1912,7 +2031,7 @@ namespace TH15 {
     }
     EHOOK_DY(th15_patch_main, 0x43c68c)
     {
-        // called once after player load into the scene, either from practice or normal or ex
+        // called once after player load into the scene or some unknown time in the middle of game, either from practice or normal or ex
         // Changes after this point can be applied to sections in this stage, and also life, bomb, etc.
         // But too late to switch between stages
         log_printf("Start of th15_patch_main\n");
@@ -1962,15 +2081,40 @@ namespace TH15 {
     // Called every frame, of course
     EHOOK_DY(th15_update, 0x4015fa)
     {
+        static uint64_t frameCount;
+        frameCount++;
+        static int secPrev;
+        // 4E7795 sets the game mode. Force it to be 1 can always start point device mode
+        // , even in EX. But in EX returning to previous checkpoint restarts the whole EX stage
+        // 4e73f0 is stage (1-6, and 7 for Ex)! 4e75c8 is probably also stage, not sure
+        int secNow = *(int32_t*)(0x4e73f8); // this is not the same as pracParam.section!!!!!
+        if (secPrev != secNow) {
+            log_printf("\n=====Sec change=====\n\n");
+            char buffer[500];
+            sprintf(buffer, "secNow:%i\n", secNow);
+            log_print(buffer);
+            storedSec = secNow;
+            secPrev = secNow;
+
+            // TODO: store player's bomb, score, etc.
+        }
+
         static int lifePrev;
         int lifeNow = *(int32_t*)(0x4E7450);
-        
-        if (lifePrev > lifeNow) {
-            log_printf("\n=====Life num decrease=====\n\n");
-            ResetLifeBomb();
-            SetSection();
+        auto gamemode = *(int32_t*)(0x4e7ecc); // when gamemode is 7, means it's in game now (fighting)
+        if (lifePrev > lifeNow && gamemode == 7) {
+            static uint64_t lastResetFrame;
+            if (frameCount > lastResetFrame + 60) { // After a reset, don't reset too soon
+                log_printf("\n=====Life num decrease=====\n\n");
+                ResetLifeBomb();
+                ResetSection();
+                lastResetFrame = frameCount;
+            }
         }
         lifePrev = lifeNow;
+
+        SetPointDeviceMode(*(THOverlay::singleton().mElBgm));
+
         GameGuiBegin(IMPL_WIN32_DX9, !THAdvOptWnd::singleton().IsOpen());
 
         // Gui components update
@@ -2039,3 +2183,10 @@ void TH15Init()
     TH15::THInitHook::singleton().EnableAllHooks();
 }
 }
+
+
+// TODO: problems in EX
+// bgm is always the same, the first one of EX
+// after doremi SC 3, she always appear until Heca
+// Heca NS 2 will goto S2, NS 3 will goto S3, and so on
+// 

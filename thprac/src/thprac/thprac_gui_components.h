@@ -12,6 +12,8 @@
 #include "thprac_gui_locale.h"
 #include "thprac_hook.h"
 #include "utils/utils.h"
+#include "thprac_log.h"
+#include "thprac_pointdevice.h"
 
 namespace THPrac {
 void ImRotateStart();
@@ -668,8 +670,18 @@ namespace Gui {
             mXOffset1 = x_offset_prop_1 * disp_x;
             mXOffset2 = x_offset_prop_2 * disp_x;
         }
+        // this function is not called when using Backspace UI
         inline void Toggle(bool status)
         {
+            //log_printf("Toggle called\n");
+            //if (mKey = VK_F7) {
+            //    pointDeviceMode = !pointDeviceMode;
+            //    if (pointDeviceMode) {
+            //        log_printf("Toggle F7. pointDeviceMode on\n");
+            //    } else {
+            //        log_printf("Toggle F7. pointDeviceMode off\n");
+            //    }
+            //}
             mStatus = status;
             if (status) {
                 for (auto& hook : mHooks) {
